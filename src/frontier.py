@@ -26,7 +26,7 @@ class URLFrontier :
       pass
 
   def crawl(self) :
-    for i in range(1,10):
+    for i in range(1,2):
       soup = self.__getSoup(self.domain.format(x=i))
       self.__getReviews(soup)
       if not soup.find('li', {'class': 'a-disabled a-last'}):

@@ -1,39 +1,54 @@
-import requests
-from bs4 import BeautifulSoup
+from mpi4py import MPI
+import numpy as np
+from pandas.core.frame import DataFrame
+import frontier
+import mongo
 import pandas as pd
 
-reviewlist = []
+comm = MPI.COMM_WORLD
+size = comm.Get_size()
+rank = comm.Get_rank()
 
-def get_soup(url):
-    r = requests.get('http://localhost:8050/render.html', params={'url': url, 'wait': 2})
-    soup = BeautifulSoup(r.text, 'html.parser')
-    return soup
+mongoDb = mongo.MongoDatabase()
+domainFeeder = mongoDb.getDomainFeederData()
 
+if rank > 1 and rank < 6:
+  print("Crawler ", str(rank), " starting...")
+  crawler = frontier.URLFrontier(domainFeeder[rank-1]['domain'])
+  crawler.crawl()
+  result = crawler.getResult()
 
-def get_reviews(soup):
-    reviews = soup.find_all('div', {'data-hook': 'review'})
-    try:
-        for item in reviews:
-            review = {
-            'product': soup.title.text.replace('Amazon.co.uk:Customer reviews:', '').strip(),
-            'title': item.find('a', {'data-hook': 'review-title'}).text.strip(),
-            'rating':  float(item.find('i', {'data-hook': 'review-star-rating'}).text.replace('out of 5 stars', '').strip()),
-            'body': item.find('span', {'data-hook': 'review-body'}).text.strip(),
-            }
-            reviewlist.append(review)
-    except:
-        pass
+  # send data to tokenizer
+  comm.send(result, dest=6, tag=11)
 
-for x in range(1,10):
-    soup = get_soup(f'https://www.amazon.co.uk/product-reviews/B003LNLPQ6/ref=cm_cr_arp_d_paging_btm_next_2?ie=UTF8&reviewerType=all_reviews&pageNumber={x}')
-    print(f'Getting page: {x}')
-    get_reviews(soup)
-    print(len(reviewlist))
-    if not soup.find('li', {'class': 'a-disabled a-last'}):
-        pass
-    else:
-        break
+  #save data to mongo
+  mongoDb.insertBulkData('CrawlResult', result)
 
-df = pd.DataFrame(reviewlist)
-df.to_excel('sony-headphones.xlsx', index=False)
-print('Fin.')
+  print("Crawler ", str(rank), " is all done...")
+
+elif rank == 6:
+  print("Starting Tokenizer...")
+  status = [None, False, False, False, False, False]
+  idx = 1
+  data = []
+
+  while idx < 6 :
+    if status[idx] :
+      # If status is True which mean the data for crawler idx has been fetched
+      idx += 1
+    else :
+      # If status is False which mean the data for crawler idx has not been fetched
+      response = comm.recv(source=idx, tag=11)
+
+      if len(response) == 0 :
+        # response is empty, go back to idx 1
+        idx = 1
+      else :
+        # response is not empty, add response to data and change status
+        print(len(response))
+        data.extend(response)
+        status[idx] = True
+    
+  # df variable is a data contain all crawl result
+  df = DataFrame(data)
+  
