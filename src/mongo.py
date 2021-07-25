@@ -14,3 +14,8 @@ class MongoDatabase :
     db = self.client.get_database('DistributedCrawler')
     collection = db.get_collection(db_name)
     collection.insert_many(data)
+
+  def insertOneData(self, db_name, data) :
+    db = self.client.get_database('DistributedCrawler')
+    collection = db.get_collection(db_name)
+    collection.insert_one(data)

@@ -5,13 +5,16 @@ import frontier
 import mongo
 import pandas as pd
 import preprocessing
+import time
 
 comm = MPI.COMM_WORLD
 size = comm.Get_size()
 rank = comm.Get_rank()
+item_size = 0
 
 mongoDb = mongo.MongoDatabase()
 domainFeeder = mongoDb.getDomainFeederData()
+start_time = time.time()
 
 if rank > 0 and rank < 6:
   print("Crawler ", str(rank), " starting...")
@@ -53,9 +56,18 @@ elif rank == 6:
   # df variable is a data contain all crawl result
   df = DataFrame(data)
 
+  item_size = df.shape[0]
   # perform text preprocessing
   preprocessResult = preprocessing.preprocessText(df)
   print("Finish preprocessing...")
 
   #save preprocess data to mongo
   mongoDb.insertBulkData('TokenizeResult', preprocessResult)
+
+  information = {
+    'itemCollected' : item_size,
+    'time' : time.time() - start_time,
+    'thread' : 5
+  }
+
+  mongoDb.insertOneData('RunInformation', information)
