@@ -4,6 +4,7 @@ from pandas.core.frame import DataFrame
 import frontier
 import mongo
 import pandas as pd
+import preprocessing
 
 comm = MPI.COMM_WORLD
 size = comm.Get_size()
@@ -12,7 +13,7 @@ rank = comm.Get_rank()
 mongoDb = mongo.MongoDatabase()
 domainFeeder = mongoDb.getDomainFeederData()
 
-if rank > 1 and rank < 6:
+if rank > 0 and rank < 6:
   print("Crawler ", str(rank), " starting...")
   crawler = frontier.URLFrontier(domainFeeder[rank-1]['domain'])
   crawler.crawl()
@@ -27,7 +28,7 @@ if rank > 1 and rank < 6:
   print("Crawler ", str(rank), " is all done...")
 
 elif rank == 6:
-  print("Starting Tokenizer...")
+  print("Start preprocessing...")
   status = [None, False, False, False, False, False]
   idx = 1
   data = []
@@ -45,9 +46,16 @@ elif rank == 6:
         idx = 1
       else :
         # response is not empty, add response to data and change status
-        print(len(response))
+        # print(len(response))
         data.extend(response)
         status[idx] = True
     
   # df variable is a data contain all crawl result
   df = DataFrame(data)
+
+  # perform text preprocessing
+  preprocessResult = preprocessing.preprocessText(df)
+  print("Finish preprocessing...")
+
+  #save preprocess data to mongo
+  mongoDb.insertBulkData('TokenizeResult', preprocessResult)
