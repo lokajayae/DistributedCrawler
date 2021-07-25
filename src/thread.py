@@ -1,9 +1,12 @@
 import frontier
 import pandas as pd
+import logging
 
-crawler = frontier.URLFrontier("https://www.amazon.co.uk/product-reviews/B07WD58H6R/ref=cm_cr_arp_d_paging_btm_next_2?ie=UTF8&reviewerType=all_reviews&pageNumber={x}")
-crawler.crawl()
+def crawlerThread(id, domain) :
+  print(f'Thread {id} is starting...')
+  crawler = frontier.URLFrontier(domain)
+  crawler.crawl()
 
-df = pd.DataFrame(crawler.getResult())
-df.to_excel('sony-headphones.xlsx', index=False)
-print('Fin.')
+  df = pd.DataFrame(crawler.getResult())
+  # TODO Send data df to MPI
+  print(f'Thread {id} is all done...')
